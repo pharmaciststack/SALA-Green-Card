@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useQuotas } from '../../hooks/useQuotas'
 import { checkCombinedCounterMonth, checkCombinedCounterYear } from '../../utils/businessRules'
 import { getTodayString } from '../../utils/dateUtils'
+import { parseRequestError } from '../../utils/errorUtils'
 
 const schema = z.object({
   date: z.string().min(1, 'กรุณาเลือกวันที่'),
@@ -40,11 +41,8 @@ export default function FormLate() {
     try {
       const id = await createRequest(profile, 'late', data)
       navigate(`/requests/${id}`)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : ''
-      if (msg === 'COMBINED_MONTH_LIMIT') setError('ถึงขีดจำกัด 2 ครั้ง/เดือนแล้ว')
-      else if (msg === 'COMBINED_YEAR_LIMIT') setError('ถึงขีดจำกัด 12 ครั้ง/ปีแล้ว')
-      else setError('ยื่นคำขอไม่สำเร็จ กรุณาลองใหม่')
+    } catch (e) {
+      setError(parseRequestError(e))
       setSubmitting(false)
     }
   }

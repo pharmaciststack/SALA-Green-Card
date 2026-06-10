@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createRequest } from '../../services/requestService'
 import { uploadDoctorCert } from '../../services/storageService'
 import { useAuth } from '../../hooks/useAuth'
+import { parseRequestError } from '../../utils/errorUtils'
 import { useQuotas } from '../../hooks/useQuotas'
 import { countBusinessDays, requiresDoctorCert } from '../../utils/businessRules'
 import { getTodayString } from '../../utils/dateUtils'
@@ -59,8 +60,8 @@ export default function FormPersonalSick() {
         attachmentUrl,
       })
       navigate(`/requests/${id}`)
-    } catch {
-      setError('ยื่นคำขอไม่สำเร็จ กรุณาลองใหม่')
+    } catch (e) {
+      setError(parseRequestError(e))
       setSubmitting(false)
     }
   }

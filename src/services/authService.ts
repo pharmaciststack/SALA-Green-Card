@@ -9,6 +9,10 @@ export async function signInWithGoogle(): Promise<void> {
   await signInWithPopup(auth, provider)
 }
 
+export async function handleRedirectResult(): Promise<void> {
+  // no-op for popup flow
+}
+
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth)
 }
@@ -55,16 +59,22 @@ export async function createOrUpdateUserProfile(
 
 export async function completeRegistration(
   uid: string,
+  email: string,
+  photoURL: string,
   displayName: string,
   branchName: string,
   department: string,
-  employeeCode: string
+  employeeCode: string,
+  position: string
 ): Promise<void> {
   await createOrUpdateUserProfile(uid, {
+    email,
+    photoURL,
     displayName,
     branchName,
     department,
     employeeCode,
+    position,
     isProfileComplete: true,
   })
   // seed default quota

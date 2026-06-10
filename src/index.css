@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 * {
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Segoe UI', sans-serif;
 }
 
 body {
   margin: 0;
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
+  color: #1e293b;
 }
 
 #root {
@@ -15,15 +16,25 @@ body {
 
 @layer components {
   .input {
-    @apply w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent bg-white;
+    @apply w-full border-[1.5px] border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white transition-colors
+      focus:outline-none focus:border-green-600 focus:ring-[3px] focus:ring-green-600/15;
   }
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-semibold text-slate-600 mb-1;
   }
   .err {
     @apply text-red-500 text-xs mt-1;
   }
   .btn-primary {
-    @apply bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply text-white font-bold py-3 rounded-[10px] transition-all
+      disabled:opacity-60 disabled:cursor-not-allowed
+      hover:shadow-[0_4px_12px_rgba(22,163,74,0.35)] active:scale-[0.98];
+    background: linear-gradient(135deg, #16a34a, #15803d);
+  }
+  .card {
+    @apply bg-white rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.1)];
+  }
+  .card-title {
+    @apply text-base font-bold text-green-700 mb-3 flex items-center gap-2;
   }
 }

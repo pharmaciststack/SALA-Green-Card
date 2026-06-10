@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createRequest } from '../../services/requestService'
 import { useAuth } from '../../hooks/useAuth'
+import { parseRequestError } from '../../utils/errorUtils'
 
 const schema = z.object({
   date: z.string().min(1, 'กรุณาเลือกวันที่'),
@@ -30,8 +31,8 @@ export default function FormChangeHours() {
     try {
       const id = await createRequest(profile, 'change_hours', data)
       navigate(`/requests/${id}`)
-    } catch {
-      setError('ยื่นคำขอไม่สำเร็จ กรุณาลองใหม่')
+    } catch (e) {
+      setError(parseRequestError(e))
       setSubmitting(false)
     }
   }

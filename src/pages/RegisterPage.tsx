@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { completeRegistration } from '../services/authService'
+import { completeRegistration, getUserProfile } from '../services/authService'
 import { useAuthStore } from '../store/authStore'
-import { DEPARTMENTS } from '../utils/constants'
-import { getUserProfile } from '../services/authService'
+import { useAuth } from '../hooks/useAuth'
+import { DEPARTMENTS, POSITIONS, BRANCHES } from '../utils/constants'
 
 const schema = z.object({
   displayName: z.string().min(2, 'กรุณากรอกชื่อ-นามสกุล'),
   branchName: z.string().min(2, 'กรุณากรอกชื่อสาขา'),
   department: z.string().min(1, 'กรุณาเลือกแผนก'),
+  position: z.string().min(1, 'กรุณาเลือกตำแหน่ง'),
   employeeCode: z.string().min(1, 'กรุณากรอกรหัสพนักงาน'),
 })
 
@@ -18,8 +20,16 @@ type FormData = z.infer<typeof schema>
 
 export default function RegisterPage() {
   const { firebaseUser, setProfile } = useAuthStore()
+  const { isProfileComplete } = useAuth()
+  const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (isProfileComplete) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isProfileComplete, navigate])
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -35,10 +45,13 @@ export default function RegisterPage() {
     try {
       await completeRegistration(
         firebaseUser.uid,
+        firebaseUser.email ?? '',
+        firebaseUser.photoURL ?? '',
         data.displayName,
         data.branchName,
         data.department,
-        data.employeeCode
+        data.employeeCode,
+        data.position
       )
       const profile = await getUserProfile(firebaseUser.uid)
       setProfile(profile)
@@ -101,13 +114,35 @@ export default function RegisterPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               สาขา <span className="text-red-500">*</span>
             </label>
-            <input
+            <select
               {...register('branchName')}
-              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent"
-              placeholder="เช่น สาขาลาดพร้าว"
-            />
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent bg-white"
+            >
+              <option value="">-- เลือกสาขา --</option>
+              {BRANCHES.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
             {errors.branchName && (
               <p className="text-red-500 text-xs mt-1">{errors.branchName.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ตำแหน่ง <span className="text-red-500">*</span>
+            </label>
+            <select
+              {...register('position')}
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent bg-white"
+            >
+              <option value="">-- เลือกตำแหน่ง --</option>
+              {POSITIONS.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            {errors.position && (
+              <p className="text-red-500 text-xs mt-1">{errors.position.message}</p>
             )}
           </div>
 

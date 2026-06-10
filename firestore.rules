@@ -11,19 +11,74 @@ service cloud.firestore {
     // Users collection
     match /users/{uid} {
       allow read: if isAuth() && (myUid() == uid || isAdmin());
-      allow write: if isAuth() && (myUid() == uid || isAdmin());
-    }
-
-    // Leave quotas
-    match /leave_quotas/{docId} {
-      allow read: if isAuth() && (docId.matches(myUid() + '_.*') || isAdmin());
+      // New user creates their own profile — role must start as 'employee'
+      allow create: if isAuth()
+        && myUid() == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'employee'
+        && request.resource.data.areaId == '';
+      // User can update own profile but cannot change role or areaId (admin-controlled fields)
+      allow update: if isAuth()
+        && myUid() == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'areaId', 'uid']);
+      // Admin can write anything
       allow write: if isAuth() && isAdmin();
     }
 
+    // Leave quotas
+    // - Employee can only create their own doc (seeding on registration)
+    // - Only admin/director can update (approval transactions, quota management)
+    match /leave_quotas/{docId} {
+      allow read: if isAuth() && (
+        docId.matches(myUid() + '_.*') ||
+        isAdmin() ||
+        hasRole('pharmacist') ||
+        hasRole('area_manager') ||
+        hasRole('director')
+      );
+      allow create: if isAuth() && docId.matches(myUid() + '_.*');
+      allow update: if isAuth() && (isAdmin() || hasRole('director'));
+      allow delete: if isAuth() && isAdmin();
+    }
+
     // Attendance stats
+    // - Employee can create their own doc (seeding on registration)
+    // - Employee can update only the combined counter fields (for request submission)
+    // - Admin/director can update anything (approval transactions)
     match /attendance_stats/{docId} {
-      allow read: if isAuth() && (docId.matches(myUid() + '_.*') || isAdmin() || hasRole('pharmacist') || hasRole('area_manager') || hasRole('director'));
-      allow write: if isAuth() && (docId.matches(myUid() + '_.*') || isAdmin());
+      allow read: if isAuth() && (
+        docId.matches(myUid() + '_.*') ||
+        isAdmin() ||
+        hasRole('pharmacist') ||
+        hasRole('area_manager') ||
+        hasRole('director')
+      );
+      allow create: if isAuth() && docId.matches(myUid() + '_.*');
+      allow update: if isAuth() && (
+        isAdmin() ||
+        hasRole('director') ||
+        (docId.matches(myUid() + '_.*') &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['combined_counter_month', 'combined_counter_month_key', 'combined_counter_year']))
+      );
+      allow delete: if isAuth() && isAdmin();
+    }
+
+    // Mail (Firebase Trigger Email extension collection)
+    match /mail/{docId} {
+      allow create: if isAuth() && isAdmin();
+      allow read, update, delete: if isAuth() && isAdmin();
+    }
+
+    // Audit logs — append-only
+    // - Admin and director write their own log entries
+    // - Both can read; nobody can edit or delete
+    match /audit_logs/{logId} {
+      allow create: if isAuth()
+        && request.resource.data.actorUid == myUid()
+        && (isAdmin() || hasRole('director'));
+      allow read: if isAuth() && (isAdmin() || hasRole('director'));
+      allow update, delete: if false;
     }
 
     // Requests
@@ -35,11 +90,16 @@ service cloud.firestore {
         hasRole('area_manager') ||
         hasRole('director')
       );
-      allow create: if isAuth() && request.resource.data.submittedBy == myUid();
+      // Enforce submitter identity and initial status — prevents submitting pre-approved requests
+      allow create: if isAuth()
+        && request.resource.data.submittedBy == myUid()
+        && request.resource.data.status == 'pending_pharmacist';
+      // pharmacist and area_manager are equivalent — either can approve stages 1 and 2
       allow update: if isAuth() && (
         isAdmin() ||
-        (hasRole('pharmacist') && resource.data.status == 'pending_pharmacist') ||
-        (hasRole('area_manager') && resource.data.status == 'pending_manager') ||
+        ((hasRole('pharmacist') || hasRole('area_manager'))
+          && (resource.data.status == 'pending_pharmacist'
+              || resource.data.status == 'pending_manager')) ||
         (hasRole('director') && resource.data.status == 'pending_director')
       );
     }

@@ -1,6 +1,7 @@
 import { doc, onSnapshot, getDoc, setDoc, Unsubscribe } from 'firebase/firestore'
 import { db } from './firebase'
-import { LeaveQuota, AttendanceStats } from '../types'
+import { LeaveQuota, AttendanceStats, UserProfile } from '../types'
+import { writeAuditLog } from './auditLogService'
 
 export function listenQuota(uid: string, year: number, callback: (q: LeaveQuota | null) => void): Unsubscribe {
   return onSnapshot(doc(db, 'leave_quotas', `${uid}_${year}`), (snap) => {
@@ -14,8 +15,23 @@ export function listenStats(uid: string, year: number, callback: (s: AttendanceS
   })
 }
 
-export async function updateQuota(uid: string, year: number, data: Partial<LeaveQuota>): Promise<void> {
+export async function updateQuota(
+  uid: string,
+  year: number,
+  data: Partial<LeaveQuota>,
+  actor?: UserProfile,
+  targetName?: string
+): Promise<void> {
   await setDoc(doc(db, 'leave_quotas', `${uid}_${year}`), data, { merge: true })
+
+  if (actor) {
+    await writeAuditLog(
+      actor,
+      'quota_update',
+      { year, changes: data },
+      { uid, name: targetName ?? uid }
+    )
+  }
 }
 
 export async function getQuota(uid: string, year: number): Promise<LeaveQuota | null> {

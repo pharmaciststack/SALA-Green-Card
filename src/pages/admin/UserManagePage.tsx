@@ -1,42 +1,145 @@
 import { useEffect, useState } from 'react'
 import { UserProfile, UserRole } from '../../types'
 import { getAllUsers, updateUserRole } from '../../services/userService'
-import { ROLE_LABELS } from '../../utils/constants'
+import { BRANCHES, POSITIONS } from '../../utils/constants'
+import { useAuth } from '../../hooks/useAuth'
+
+const ROLE_HIERARCHY: UserRole[] = ['employee', 'pharmacist', 'area_manager', 'director', 'admin']
+
+const ROLE_META: Record<UserRole, { label: string; color: string; bg: string }> = {
+  employee:     { label: 'พนักงาน',        color: 'text-gray-600',   bg: 'bg-gray-100' },
+  pharmacist:   { label: 'เภสัชกร',        color: 'text-blue-700',   bg: 'bg-blue-50' },
+  area_manager: { label: 'ผจก.เขต',        color: 'text-purple-700', bg: 'bg-purple-50' },
+  director:     { label: 'ผู้อำนวยการ',    color: 'text-orange-700', bg: 'bg-orange-50' },
+  admin:        { label: 'ผู้ดูแลระบบ',    color: 'text-green-700',  bg: 'bg-green-50' },
+}
 
 export default function UserManagePage() {
+  const { profile: actor } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [filtered, setFiltered] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
+
+  const [search, setSearch] = useState('')
+  const [filterBranch, setFilterBranch] = useState('')
+  const [filterPosition, setFilterPosition] = useState('')
+  const [filterRole, setFilterRole] = useState('')
 
   useEffect(() => {
     getAllUsers().then((u) => { setUsers(u); setLoading(false) })
   }, [])
 
-  async function handleRoleChange(uid: string, role: UserRole, areaId: string) {
+  useEffect(() => {
+    let result = users
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (u) => u.displayName?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
+      )
+    }
+    if (filterBranch)   result = result.filter((u) => u.branchName === filterBranch)
+    if (filterPosition) result = result.filter((u) => u.position === filterPosition)
+    if (filterRole)     result = result.filter((u) => u.role === filterRole)
+    setFiltered(result)
+  }, [users, search, filterBranch, filterPosition, filterRole])
+
+  async function handleRoleChange(uid: string, role: UserRole) {
+    const target = users.find(u => u.uid === uid)
+    if (!target || !actor) return
     setSaving(uid)
-    await updateUserRole(uid, role, areaId)
+    await updateUserRole(
+      uid,
+      role,
+      target.areaId ?? '',
+      actor,
+      { name: target.displayName || target.email, previousRole: target.role }
+    )
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role } : u))
     setSaving(null)
   }
 
   if (loading) return <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-xl font-bold text-gray-800 mb-4">จัดการผู้ใช้</h1>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-800">จัดการผู้ใช้</h1>
+        <span className="text-sm text-gray-400">{filtered.length} / {users.length} คน</span>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="text"
+          placeholder="🔍 ค้นหาชื่อ หรืออีเมล..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 flex-1 min-w-48"
+        />
+        <select
+          value={filterRole}
+          onChange={(e) => setFilterRole(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+        >
+          <option value="">ทุกสิทธิ์</option>
+          {ROLE_HIERARCHY.map((r) => (
+            <option key={r} value={r}>{ROLE_META[r].label}</option>
+          ))}
+        </select>
+        <select
+          value={filterBranch}
+          onChange={(e) => setFilterBranch(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+        >
+          <option value="">ทุกสาขา</option>
+          {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
+        </select>
+        <select
+          value={filterPosition}
+          onChange={(e) => setFilterPosition(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+        >
+          <option value="">ทุกตำแหน่ง</option>
+          {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+
+      {/* Role legend */}
+      <div className="flex flex-wrap gap-2 text-xs">
+        {ROLE_HIERARCHY.map((r) => (
+          <span key={r} className={`px-2.5 py-1 rounded-full font-medium ${ROLE_META[r].bg} ${ROLE_META[r].color}`}>
+            {ROLE_META[r].label}
+          </span>
+        ))}
+        <span className="text-gray-400 self-center ml-1">← ระดับสิทธิ์น้อย → มาก</span>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
-              <th className="px-4 py-3">ชื่อ</th>
-              <th className="px-4 py-3">สาขา</th>
-              <th className="px-4 py-3">บทบาท</th>
-              <th className="px-4 py-3">Area ID</th>
-              <th className="px-4 py-3"></th>
+            <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+              <th className="px-4 py-3">ผู้ใช้</th>
+              <th className="px-4 py-3">อีเมล</th>
+              <th className="px-4 py-3">สาขา / ตำแหน่ง</th>
+              <th className="px-4 py-3">สิทธิ์ปัจจุบัน</th>
+              <th className="px-4 py-3 text-center">เปลี่ยนสิทธิ์</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((u) => (
-              <UserRow key={u.uid} user={u} saving={saving === u.uid} onSave={handleRoleChange} />
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center py-10 text-gray-400">ไม่พบผู้ใช้</td>
+              </tr>
+            )}
+            {filtered.map((u) => (
+              <UserRow
+                key={u.uid}
+                user={u}
+                saving={saving === u.uid}
+                onChange={handleRoleChange}
+              />
             ))}
           </tbody>
         </table>
@@ -45,44 +148,69 @@ export default function UserManagePage() {
   )
 }
 
-function UserRow({ user, saving, onSave }: { user: UserProfile; saving: boolean; onSave: (uid: string, role: UserRole, areaId: string) => void }) {
-  const [role, setRole] = useState<UserRole>(user.role)
-  const [areaId, setAreaId] = useState(user.areaId || '')
-
-  const roles: UserRole[] = ['employee', 'pharmacist', 'area_manager', 'director', 'admin']
+function UserRow({ user, saving, onChange }: {
+  user: UserProfile
+  saving: boolean
+  onChange: (uid: string, role: UserRole) => void
+}) {
+  const idx = ROLE_HIERARCHY.indexOf(user.role)
+  const meta = ROLE_META[user.role] ?? ROLE_META.employee
 
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="hover:bg-gray-50 transition-colors">
+      {/* User info */}
       <td className="px-4 py-3">
-        <p className="font-medium text-gray-800">{user.displayName}</p>
-        <p className="text-xs text-gray-400">{user.email}</p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm shrink-0">
+            {(user.displayName || user.email || '?')[0].toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-medium text-gray-800 truncate">{user.displayName || '—'}</p>
+            <p className="text-xs text-gray-400">{user.employeeCode || '—'}</p>
+          </div>
+        </div>
       </td>
-      <td className="px-4 py-3 text-gray-600">{user.branchName}</td>
+
+      {/* Email */}
       <td className="px-4 py-3">
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as UserRole)}
-          className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-400"
-        >
-          {roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-        </select>
+        <p className="text-xs text-gray-700 truncate max-w-[220px]" title={user.email}>
+          {user.email || '—'}
+        </p>
       </td>
+
+      {/* Branch / position */}
       <td className="px-4 py-3">
-        <input
-          value={areaId}
-          onChange={(e) => setAreaId(e.target.value)}
-          className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-green-400"
-          placeholder="area-01"
-        />
+        <p className="text-xs text-gray-700">{user.branchName || '—'}</p>
+        <p className="text-xs text-gray-400">{user.position || '—'}</p>
       </td>
+
+      {/* Current role badge */}
       <td className="px-4 py-3">
-        <button
-          onClick={() => onSave(user.uid, role, areaId)}
-          disabled={saving}
-          className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {saving ? '...' : 'บันทึก'}
-        </button>
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${meta.bg} ${meta.color}`}>
+          {meta.label}
+        </span>
+        <p className="text-[10px] text-gray-400 mt-0.5">ระดับ {idx + 1} / {ROLE_HIERARCHY.length}</p>
+      </td>
+
+      {/* Role dropdown */}
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-center gap-2">
+          <select
+            value={user.role}
+            onChange={(e) => onChange(user.uid, e.target.value as UserRole)}
+            disabled={saving}
+            className="border-[1.5px] border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer
+              focus:outline-none focus:border-green-600 focus:ring-[3px] focus:ring-green-600/15
+              disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
+          >
+            {ROLE_HIERARCHY.map((r) => (
+              <option key={r} value={r}>{ROLE_META[r].label}</option>
+            ))}
+          </select>
+          {saving && (
+            <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
       </td>
     </tr>
   )

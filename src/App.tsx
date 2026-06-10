@@ -17,12 +17,22 @@ import PharmacistInboxPage from './pages/approvals/PharmacistInboxPage'
 import ManagerInboxPage from './pages/approvals/ManagerInboxPage'
 import DirectorInboxPage from './pages/approvals/DirectorInboxPage'
 import ApprovalHistoryPage from './pages/approvals/ApprovalHistoryPage'
+import AllApprovalsPage from './pages/approvals/AllApprovalsPage'
 import UserManagePage from './pages/admin/UserManagePage'
 import QuotaManagePage from './pages/admin/QuotaManagePage'
+import AdminNotificationPage from './pages/admin/AdminNotificationPage'
+import AuditLogPage from './pages/admin/AuditLogPage'
 
 function RootRedirect() {
   const { isAuthenticated, isProfileComplete, loading } = useAuth()
-  if (loading) return null
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-500 text-sm">กำลังโหลด...</p>
+      </div>
+    </div>
+  )
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!isProfileComplete) return <Navigate to="/register" replace />
   return <Navigate to="/dashboard" replace />
@@ -49,14 +59,10 @@ export default function App() {
             <Route path="/requests/:id" element={<RequestDetailPage />} />
             <Route path="/my-history" element={<MyHistoryPage />} />
 
-            {/* Pharmacist */}
-            <Route element={<ProtectedRoute allowedRoles={['pharmacist', 'admin']} />}>
+            {/* Pharmacist & Area Manager are equivalent — either role can access both inboxes */}
+            <Route element={<ProtectedRoute allowedRoles={['pharmacist', 'area_manager', 'admin']} />}>
               <Route path="/pharmacist/inbox" element={<PharmacistInboxPage />} />
               <Route path="/pharmacist/history" element={<ApprovalHistoryPage role="pharmacist" />} />
-            </Route>
-
-            {/* Area Manager */}
-            <Route element={<ProtectedRoute allowedRoles={['area_manager', 'admin']} />}>
               <Route path="/manager/inbox" element={<ManagerInboxPage />} />
               <Route path="/manager/history" element={<ApprovalHistoryPage role="area_manager" />} />
             </Route>
@@ -67,10 +73,21 @@ export default function App() {
               <Route path="/director/history" element={<ApprovalHistoryPage role="director" />} />
             </Route>
 
+            {/* Unified approvals overview — visible to all approver roles */}
+            <Route element={<ProtectedRoute allowedRoles={['pharmacist', 'area_manager', 'director', 'admin']} />}>
+              <Route path="/approvals" element={<AllApprovalsPage />} />
+            </Route>
+
+            {/* Audit logs — visible to admin and director */}
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'director']} />}>
+              <Route path="/audit-logs" element={<AuditLogPage />} />
+            </Route>
+
             {/* Admin */}
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
               <Route path="/admin/users" element={<UserManagePage />} />
               <Route path="/admin/quotas" element={<QuotaManagePage />} />
+              <Route path="/admin/notify" element={<AdminNotificationPage />} />
             </Route>
           </Route>
         </Route>

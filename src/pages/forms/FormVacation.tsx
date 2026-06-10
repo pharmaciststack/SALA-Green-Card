@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createRequest } from '../../services/requestService'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuotas } from '../../hooks/useQuotas'
+import { parseRequestError } from '../../utils/errorUtils'
 import { countBusinessDays, checkVacationAdvanceNotice, checkVacationMonthLimit } from '../../utils/businessRules'
 import { getMinVacationDate } from '../../utils/dateUtils'
 
@@ -40,8 +41,8 @@ export default function FormVacation() {
     try {
       const id = await createRequest(profile, 'vacation', { ...data, days })
       navigate(`/requests/${id}`)
-    } catch {
-      setError('ยื่นคำขอไม่สำเร็จ กรุณาลองใหม่')
+    } catch (e) {
+      setError(parseRequestError(e))
       setSubmitting(false)
     }
   }

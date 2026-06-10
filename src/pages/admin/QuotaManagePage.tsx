@@ -3,8 +3,10 @@ import { UserProfile } from '../../types'
 import { getAllUsers } from '../../services/userService'
 import { getQuota, updateQuota } from '../../services/quotaService'
 import { LeaveQuota } from '../../types'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function QuotaManagePage() {
+  const { profile: actor } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [selected, setSelected] = useState<UserProfile | null>(null)
   const [quota, setQuota] = useState<LeaveQuota | null>(null)
@@ -22,9 +24,9 @@ export default function QuotaManagePage() {
   }
 
   async function handleSave() {
-    if (!selected || !quota) return
+    if (!selected || !quota || !actor) return
     setSaving(true)
-    await updateQuota(selected.uid, year, quota)
+    await updateQuota(selected.uid, year, quota, actor, selected.displayName || selected.email)
     setSaving(false)
   }
 

@@ -1,29 +1,57 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { signInWithGoogle } from '../services/authService'
+import { useAuth } from '../hooks/useAuth'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const { isAuthenticated, isProfileComplete } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(isProfileComplete ? '/dashboard' : '/register', { replace: true })
+    }
+  }, [isAuthenticated, isProfileComplete, navigate])
 
   async function handleLogin() {
     setLoading(true)
     setError('')
     try {
       await signInWithGoogle()
-    } catch {
-      setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? ''
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        // user closed popup, just reset
+      } else if (code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In ยังไม่ได้เปิดใช้งาน กรุณาแจ้ง Admin')
+      } else if (code === 'auth/popup-blocked') {
+        setError('Popup ถูก block กรุณาอนุญาต popup สำหรับหน้านี้แล้วลองใหม่')
+      } else {
+        setError(`เข้าสู่ระบบไม่สำเร็จ (${code || 'unknown'}) กรุณาลองใหม่อีกครั้ง`)
+      }
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md text-center">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] w-full max-w-md text-center overflow-hidden">
+        <div
+          className="px-6 py-5 text-white"
+          style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)' }}
+        >
+          <img
+            src="https://img1.pic.in.th/images/logo--1.png"
+            alt="ศาลาโอสถ"
+            className="w-14 h-14 mx-auto mb-2 bg-white rounded-xl p-1.5 object-contain"
+          />
+          <h1 className="text-xl font-bold">ระบบลาและบันทึกเวลาทำงาน</h1>
+          <p className="text-xs opacity-80 mt-1">บริษัท ศาลาโอสถรีเทล จำกัด</p>
+        </div>
+        <div className="p-8">
         <div className="mb-6">
-          <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">📋</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">ระบบลาและบันทึกเวลาทำงาน</h1>
           <p className="text-gray-500 text-sm">เข้าสู่ระบบด้วยบัญชี Gmail ขององค์กร</p>
         </div>
 
@@ -50,6 +78,7 @@ export default function LoginPage() {
         <p className="text-xs text-gray-400 mt-6">
           ใช้ได้เฉพาะบัญชีที่ได้รับอนุญาตจากองค์กรเท่านั้น
         </p>
+        </div>
       </div>
     </div>
   )

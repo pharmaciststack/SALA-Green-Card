@@ -10,6 +10,7 @@ export interface UserProfile {
   branchName: string
   employeeCode: string
   department: string
+  position: string
   isProfileComplete: boolean
   createdAt: Date
   updatedAt: Date
@@ -105,4 +106,23 @@ export interface Branch {
   name: string
   managerId?: string
   pharmacistId?: string
+}
+
+export type AuditAction =
+  | 'role_change'
+  | 'quota_update'
+  | 'send_notification'
+  | 'request_approved'
+  | 'request_rejected'
+
+export interface AuditLog {
+  logId: string
+  action: AuditAction
+  actorUid: string
+  actorName: string
+  actorRole: UserRole
+  targetUid?: string
+  targetName?: string
+  details: Record<string, unknown>
+  createdAt: Date
 }

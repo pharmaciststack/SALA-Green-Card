@@ -1,11 +1,13 @@
 import {
-  collection, doc, addDoc, getDoc, getDocs,
+  collection, doc, getDoc, getDocs,
   query, where, orderBy, onSnapshot, serverTimestamp, runTransaction,
   Unsubscribe
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { LeaveRequest, RequestType, RequestStatus, RequestDetails, UserProfile } from '../types'
 import { getCurrentMonthKey } from '../utils/businessRules'
+import { COMBINED_COUNTER_MONTH_LIMIT, COMBINED_COUNTER_YEAR_LIMIT } from '../utils/constants'
+import { writeAuditLog } from './auditLogService'
 
 function toRequest(id: string, data: Record<string, unknown>): LeaveRequest {
   return {
@@ -31,52 +33,43 @@ export async function createRequest(
   details: RequestDetails
 ): Promise<string> {
   const isCombined = type === 'change_day_off' || type === 'late'
+  const year = new Date().getFullYear()
+  const reqRef = doc(collection(db, 'requests'))
 
-  if (isCombined) {
-    // Check combined counter limits
-    const statsRef = doc(db, 'attendance_stats', `${profile.uid}_${new Date().getFullYear()}`)
-    const statsSnap = await getDoc(statsRef)
-    if (statsSnap.exists()) {
-      const stats = statsSnap.data()
-      const monthKey = getCurrentMonthKey()
-      const currentMonthKey = stats.combined_counter_month_key
-      const monthCount = currentMonthKey === monthKey ? stats.combined_counter_month : 0
-      if (monthCount >= 2) throw new Error('COMBINED_MONTH_LIMIT')
-      if (stats.combined_counter_year >= 12) throw new Error('COMBINED_YEAR_LIMIT')
+  await runTransaction(db, async (tx) => {
+    if (isCombined) {
+      const statsRef = doc(db, 'attendance_stats', `${profile.uid}_${year}`)
+      const statsSnap = await tx.get(statsRef)
+      if (statsSnap.exists()) {
+        const stats = statsSnap.data()
+        const monthKey = getCurrentMonthKey()
+        const monthCount = stats.combined_counter_month_key === monthKey
+          ? stats.combined_counter_month
+          : 0
+        if (monthCount >= COMBINED_COUNTER_MONTH_LIMIT) throw new Error('COMBINED_MONTH_LIMIT')
+        if ((stats.combined_counter_year ?? 0) >= COMBINED_COUNTER_YEAR_LIMIT) throw new Error('COMBINED_YEAR_LIMIT')
+        tx.update(statsRef, {
+          combined_counter_month: monthCount + 1,
+          combined_counter_month_key: monthKey,
+          combined_counter_year: (stats.combined_counter_year ?? 0) + 1,
+        })
+      }
     }
-  }
 
-  const ref = await addDoc(collection(db, 'requests'), {
-    type,
-    submittedBy: profile.uid,
-    submitterName: profile.displayName,
-    submitterEmail: profile.email,
-    areaId: profile.areaId || profile.branchName,
-    status: 'pending_pharmacist' as RequestStatus,
-    details,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    tx.set(reqRef, {
+      type,
+      submittedBy: profile.uid,
+      submitterName: profile.displayName ?? '',
+      submitterEmail: profile.email ?? '',
+      areaId: profile.areaId || profile.branchName,
+      status: 'pending_pharmacist' as RequestStatus,
+      details,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
   })
 
-  // Increment combined counter
-  if (isCombined) {
-    const statsRef = doc(db, 'attendance_stats', `${profile.uid}_${new Date().getFullYear()}`)
-    const monthKey = getCurrentMonthKey()
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(statsRef)
-      if (!snap.exists()) return
-      const data = snap.data()
-      const currentMonthKey = data.combined_counter_month_key
-      const monthCount = currentMonthKey === monthKey ? data.combined_counter_month : 0
-      tx.update(statsRef, {
-        combined_counter_month: monthCount + 1,
-        combined_counter_month_key: monthKey,
-        combined_counter_year: (data.combined_counter_year ?? 0) + 1,
-      })
-    })
-  }
-
-  return ref.id
+  return reqRef.id
 }
 
 async function updateRequestStatus(
@@ -147,11 +140,27 @@ export const approveByManager = (id: string, approver: UserProfile, note: string
 export const rejectByManager = (id: string, approver: UserProfile, note: string) =>
   updateRequestStatus(id, 'rejected', 'managerApproval', approver, 'rejected', note)
 
-export const approveByDirector = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'approved', 'directorApproval', approver, 'approved', note)
+export const approveByDirector = async (id: string, approver: UserProfile, note: string) => {
+  const req = await getRequest(id)
+  await updateRequestStatus(id, 'approved', 'directorApproval', approver, 'approved', note)
+  await writeAuditLog(
+    approver,
+    'request_approved',
+    { requestId: id, type: req?.type, note, days: req?.details?.days },
+    req ? { uid: req.submittedBy, name: req.submitterName } : undefined
+  )
+}
 
-export const rejectByDirector = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'rejected', 'directorApproval', approver, 'rejected', note)
+export const rejectByDirector = async (id: string, approver: UserProfile, note: string) => {
+  const req = await getRequest(id)
+  await updateRequestStatus(id, 'rejected', 'directorApproval', approver, 'rejected', note)
+  await writeAuditLog(
+    approver,
+    'request_rejected',
+    { requestId: id, type: req?.type, note },
+    req ? { uid: req.submittedBy, name: req.submitterName } : undefined
+  )
+}
 
 export async function getRequest(id: string): Promise<LeaveRequest | null> {
   const snap = await getDoc(doc(db, 'requests', id))

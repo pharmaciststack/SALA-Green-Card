@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { UserRole } from '../../types'
 
@@ -29,9 +29,9 @@ export default function ProtectedRoute({ allowedRoles }: Props) {
         <div className="text-center">
           <p className="text-4xl mb-3">🚫</p>
           <h2 className="text-lg font-bold text-gray-700">ไม่มีสิทธิ์เข้าถึงหน้านี้</h2>
-          <a href="/dashboard" className="text-green-600 text-sm mt-2 block hover:underline">
+          <Link to="/dashboard" className="text-green-600 text-sm mt-2 block hover:underline">
             กลับหน้าหลัก
-          </a>
+          </Link>
         </div>
       </div>
     )
