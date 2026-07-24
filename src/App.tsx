@@ -22,6 +22,7 @@ import UserManagePage from './pages/admin/UserManagePage'
 import QuotaManagePage from './pages/admin/QuotaManagePage'
 import AdminNotificationPage from './pages/admin/AdminNotificationPage'
 import AuditLogPage from './pages/admin/AuditLogPage'
+import SystemSettingsPage from './pages/admin/SystemSettingsPage'
 
 function RootRedirect() {
   const { isAuthenticated, isProfileComplete, loading } = useAuth()
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="/admin/users" element={<UserManagePage />} />
               <Route path="/admin/quotas" element={<QuotaManagePage />} />
               <Route path="/admin/notify" element={<AdminNotificationPage />} />
+              <Route path="/admin/settings" element={<SystemSettingsPage />} />
             </Route>
           </Route>
         </Route>

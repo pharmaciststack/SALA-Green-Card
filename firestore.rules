@@ -81,6 +81,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // System settings — single config doc
+    // - Any authenticated user can read (business rules need it)
+    // - Only admin can write
+    match /system_settings/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdmin();
+    }
+
     // Requests
     match /requests/{requestId} {
       allow read: if isAuth() && (

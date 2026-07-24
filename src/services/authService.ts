@@ -2,6 +2,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuth
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { UserProfile } from '../types'
+import { getCachedSettings } from './settingsService'
 
 const provider = new GoogleAuthProvider()
 
@@ -82,14 +83,15 @@ export async function completeRegistration(
   const quotaRef = doc(db, 'leave_quotas', `${uid}_${year}`)
   const qsnap = await getDoc(quotaRef)
   if (!qsnap.exists()) {
+    const s = getCachedSettings()
     await setDoc(quotaRef, {
       uid,
       year,
-      personal_total: 3,
+      personal_total: s.defaultPersonalDays,
       personal_used: 0,
-      sick_total: 30,
+      sick_total: s.defaultSickDays,
       sick_used: 0,
-      vacation_total: 0,
+      vacation_total: s.defaultVacationDays,
       vacation_used: 0,
       weekly_off_accumulated: 0,
     })

@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { to: '/admin/users', label: 'จัดการผู้ใช้', icon: '👥', roles: ['admin'] },
   { to: '/admin/quotas', label: 'จัดการโควต้า', icon: '⚙️', roles: ['admin'] },
   { to: '/admin/notify', label: 'ส่งอีเมลแจ้งเตือน', icon: '📧', roles: ['admin'] },
+  { to: '/admin/settings', label: 'ตั้งค่าระบบ', icon: '⚙️', roles: ['admin'] },
   { to: '/audit-logs', label: 'ประวัติการดำเนินการ', icon: '📜', roles: ['admin', 'director'] },
 ]
 

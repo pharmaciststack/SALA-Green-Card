@@ -11,6 +11,7 @@ const ACTION_META: Record<AuditAction, { label: string; icon: string; color: str
   send_notification: { label: 'ส่งอีเมล',          icon: '📧', color: 'bg-orange-50 text-orange-700' },
   request_approved:  { label: 'อนุมัติคำขอ',       icon: '✅', color: 'bg-green-50 text-green-700' },
   request_rejected:  { label: 'ปฏิเสธคำขอ',        icon: '❌', color: 'bg-red-50 text-red-700' },
+  settings_update:   { label: 'แก้ไขตั้งค่าระบบ',  icon: '⚙️', color: 'bg-gray-100 text-gray-700' },
 }
 
 export default function AuditLogPage() {
@@ -43,6 +44,8 @@ export default function AuditLogPage() {
       case 'request_approved':
       case 'request_rejected':
         return `${d.type}${d.days ? ` · ${d.days} วัน` : ''}${d.note ? ` · "${d.note}"` : ''}`
+      case 'settings_update':
+        return `combined ${d.combinedCounterMonthLimit}/เดือน · สาย ${d.tardinessBonusThreshold} นาที · วันหยุด ${d.holidayCount} วัน`
       default:
         return ''
     }

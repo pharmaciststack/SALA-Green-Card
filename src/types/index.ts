@@ -108,12 +108,35 @@ export interface Branch {
   pharmacistId?: string
 }
 
+export interface SystemSettings {
+  // Combined counter (เปลี่ยนวันหยุด + มาสาย + ออกก่อนเวลา)
+  combinedCounterMonthLimit: number
+  combinedCounterYearLimit: number
+  // เกณฑ์มาสาย (นาที/เดือน)
+  tardinessBonusThreshold: number
+  // ลาพักร้อน
+  vacationAdvanceDays: number      // ต้องยื่นล่วงหน้ากี่วัน
+  vacationMaxConsecutive: number   // ลาต่อเนื่องได้สูงสุดกี่วัน/ครั้ง
+  // ลาป่วย
+  sickCertRequiredDays: number     // ป่วยกี่วันขึ้นไปต้องมีใบรับรองแพทย์
+  // โควต้าเริ่มต้น (ตอนพนักงานสมัครใหม่)
+  defaultSickDays: number
+  defaultPersonalDays: number
+  defaultVacationDays: number
+  defaultWeeklyOffMax: number
+  // วันหยุดประเพณี (YYYY-MM-DD)
+  holidays: string[]
+  updatedAt?: Date
+  updatedByName?: string
+}
+
 export type AuditAction =
   | 'role_change'
   | 'quota_update'
   | 'send_notification'
   | 'request_approved'
   | 'request_rejected'
+  | 'settings_update'
 
 export interface AuditLog {
   logId: string
