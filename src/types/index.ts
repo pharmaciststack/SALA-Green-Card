@@ -12,6 +12,7 @@ export interface UserProfile {
   department: string
   position: string
   isProfileComplete: boolean
+  groupId?: string          // employee group determining which settings apply
   createdAt: Date
   updatedAt: Date
 }
@@ -108,7 +109,8 @@ export interface Branch {
   pharmacistId?: string
 }
 
-export interface SystemSettings {
+// Numeric business-rule settings — configurable per employee group.
+export interface GroupSettings {
   // Combined counter (เปลี่ยนวันหยุด + มาสาย + ออกก่อนเวลา)
   combinedCounterMonthLimit: number
   combinedCounterYearLimit: number
@@ -124,10 +126,22 @@ export interface SystemSettings {
   defaultPersonalDays: number
   defaultVacationDays: number
   defaultWeeklyOffMax: number
-  // วันหยุดประเพณี (YYYY-MM-DD)
+}
+
+// Org-wide settings: the default rule values + shared holiday calendar.
+export interface SystemSettings extends GroupSettings {
+  // วันหยุดประเพณี (YYYY-MM-DD) — shared across all groups
   holidays: string[]
   updatedAt?: Date
   updatedByName?: string
+}
+
+// An employee group with its own rule values. Holidays come from SystemSettings.
+export interface EmployeeGroup extends GroupSettings {
+  id: string
+  name: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export type AuditAction =
@@ -137,6 +151,8 @@ export type AuditAction =
   | 'request_approved'
   | 'request_rejected'
   | 'settings_update'
+  | 'group_update'
+  | 'group_assign'
 
 export interface AuditLog {
   logId: string

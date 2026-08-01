@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { UserProfile, UserRole } from '../../types'
-import { getAllUsers, updateUserRole } from '../../services/userService'
+import { UserProfile, UserRole, EmployeeGroup } from '../../types'
+import { getAllUsers, updateUserRole, updateUserGroup } from '../../services/userService'
+import { listGroups } from '../../services/groupService'
 import { BRANCHES, POSITIONS } from '../../utils/constants'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -17,6 +18,7 @@ const ROLE_META: Record<UserRole, { label: string; color: string; bg: string }> 
 export default function UserManagePage() {
   const { profile: actor } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [groups, setGroups] = useState<EmployeeGroup[]>([])
   const [filtered, setFiltered] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -27,7 +29,9 @@ export default function UserManagePage() {
   const [filterRole, setFilterRole] = useState('')
 
   useEffect(() => {
-    getAllUsers().then((u) => { setUsers(u); setLoading(false) })
+    Promise.all([getAllUsers(), listGroups()])
+      .then(([u, g]) => { setUsers(u); setGroups(g) })
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -56,6 +60,20 @@ export default function UserManagePage() {
       { name: target.displayName || target.email, previousRole: target.role }
     )
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role } : u))
+    setSaving(null)
+  }
+
+  async function handleGroupChange(uid: string, groupId: string) {
+    const target = users.find(u => u.uid === uid)
+    if (!target || !actor) return
+    setSaving(uid)
+    await updateUserGroup(
+      uid,
+      groupId,
+      actor,
+      { name: target.displayName || target.email, groupName: groups.find(g => g.id === groupId)?.name ?? 'ค่าเริ่มต้น' }
+    )
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, groupId } : u))
     setSaving(null)
   }
 
@@ -125,20 +143,23 @@ export default function UserManagePage() {
               <th className="px-4 py-3">สาขา / ตำแหน่ง</th>
               <th className="px-4 py-3">สิทธิ์ปัจจุบัน</th>
               <th className="px-4 py-3 text-center">เปลี่ยนสิทธิ์</th>
+              <th className="px-4 py-3 text-center">กลุ่มพนักงาน</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-10 text-gray-400">ไม่พบผู้ใช้</td>
+                <td colSpan={6} className="text-center py-10 text-gray-400">ไม่พบผู้ใช้</td>
               </tr>
             )}
             {filtered.map((u) => (
               <UserRow
                 key={u.uid}
                 user={u}
+                groups={groups}
                 saving={saving === u.uid}
                 onChange={handleRoleChange}
+                onGroupChange={handleGroupChange}
               />
             ))}
           </tbody>
@@ -148,10 +169,12 @@ export default function UserManagePage() {
   )
 }
 
-function UserRow({ user, saving, onChange }: {
+function UserRow({ user, groups, saving, onChange, onGroupChange }: {
   user: UserProfile
+  groups: EmployeeGroup[]
   saving: boolean
   onChange: (uid: string, role: UserRole) => void
+  onGroupChange: (uid: string, groupId: string) => void
 }) {
   const idx = ROLE_HIERARCHY.indexOf(user.role)
   const meta = ROLE_META[user.role] ?? ROLE_META.employee
@@ -210,6 +233,25 @@ function UserRow({ user, saving, onChange }: {
           {saving && (
             <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
           )}
+        </div>
+      </td>
+
+      {/* Group dropdown */}
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-center">
+          <select
+            value={user.groupId ?? ''}
+            onChange={(e) => onGroupChange(user.uid, e.target.value)}
+            disabled={saving}
+            className="border-[1.5px] border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer
+              focus:outline-none focus:border-green-600 focus:ring-[3px] focus:ring-green-600/15
+              disabled:opacity-50 disabled:cursor-not-allowed min-w-[130px]"
+          >
+            <option value="">⭐ ค่าเริ่มต้น</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
         </div>
       </td>
     </tr>

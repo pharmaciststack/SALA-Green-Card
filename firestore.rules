@@ -20,7 +20,7 @@ service cloud.firestore {
       // User can update own profile but cannot change role or areaId (admin-controlled fields)
       allow update: if isAuth()
         && myUid() == uid
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'areaId', 'uid']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'areaId', 'uid', 'groupId']);
       // Admin can write anything
       allow write: if isAuth() && isAdmin();
     }
@@ -85,6 +85,14 @@ service cloud.firestore {
     // - Any authenticated user can read (business rules need it)
     // - Only admin can write
     match /system_settings/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdmin();
+    }
+
+    // Employee groups — per-group rule settings
+    // - Any authenticated user can read (to resolve their own group)
+    // - Only admin can create/edit/delete
+    match /employee_groups/{groupId} {
       allow read: if isAuth();
       allow write: if isAuth() && isAdmin();
     }

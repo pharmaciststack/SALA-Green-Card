@@ -12,6 +12,8 @@ const ACTION_META: Record<AuditAction, { label: string; icon: string; color: str
   request_approved:  { label: 'อนุมัติคำขอ',       icon: '✅', color: 'bg-green-50 text-green-700' },
   request_rejected:  { label: 'ปฏิเสธคำขอ',        icon: '❌', color: 'bg-red-50 text-red-700' },
   settings_update:   { label: 'แก้ไขตั้งค่าระบบ',  icon: '⚙️', color: 'bg-gray-100 text-gray-700' },
+  group_update:      { label: 'จัดการกลุ่ม',       icon: '👥', color: 'bg-teal-50 text-teal-700' },
+  group_assign:      { label: 'ย้ายกลุ่มพนักงาน',  icon: '🔀', color: 'bg-teal-50 text-teal-700' },
 }
 
 export default function AuditLogPage() {
@@ -46,6 +48,10 @@ export default function AuditLogPage() {
         return `${d.type}${d.days ? ` · ${d.days} วัน` : ''}${d.note ? ` · "${d.note}"` : ''}`
       case 'settings_update':
         return `combined ${d.combinedCounterMonthLimit}/เดือน · สาย ${d.tardinessBonusThreshold} นาที · วันหยุด ${d.holidayCount} วัน`
+      case 'group_update':
+        return `${d.action === 'create' ? 'สร้าง' : d.action === 'delete' ? 'ลบ' : 'แก้ไข'}กลุ่ม "${d.name}"`
+      case 'group_assign':
+        return `→ กลุ่ม "${d.groupName}"`
       default:
         return ''
     }

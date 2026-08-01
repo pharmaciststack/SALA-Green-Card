@@ -1,7 +1,21 @@
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, Timestamp, Unsubscribe } from 'firebase/firestore'
 import { db } from './firebase'
-import { SystemSettings, UserProfile } from '../types'
+import { SystemSettings, GroupSettings, UserProfile } from '../types'
 import { writeAuditLog } from './auditLogService'
+
+// The numeric settings that can differ per employee group.
+export const NUMERIC_SETTING_KEYS: (keyof GroupSettings)[] = [
+  'combinedCounterMonthLimit',
+  'combinedCounterYearLimit',
+  'tardinessBonusThreshold',
+  'vacationAdvanceDays',
+  'vacationMaxConsecutive',
+  'sickCertRequiredDays',
+  'defaultSickDays',
+  'defaultPersonalDays',
+  'defaultVacationDays',
+  'defaultWeeklyOffMax',
+]
 import {
   COMBINED_COUNTER_MONTH_LIMIT,
   COMBINED_COUNTER_YEAR_LIMIT,
@@ -38,6 +52,16 @@ let cache: SystemSettings = DEFAULT_SETTINGS
 
 export function getCachedSettings(): SystemSettings {
   return cache
+}
+
+// Overwrite the cache with a group's numeric settings while keeping the
+// org-wide holiday calendar. Used to resolve the signed-in user's group.
+export function applyGroupToCache(group: GroupSettings): void {
+  const merged = { ...cache } as unknown as Record<string, unknown>
+  for (const k of NUMERIC_SETTING_KEYS) {
+    merged[k] = group[k]
+  }
+  cache = merged as unknown as SystemSettings
 }
 
 function normalize(data: Record<string, unknown>): SystemSettings {

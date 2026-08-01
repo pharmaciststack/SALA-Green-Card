@@ -34,3 +34,21 @@ export async function updateUserRole(
     )
   }
 }
+
+export async function updateUserGroup(
+  uid: string,
+  groupId: string,
+  actor?: UserProfile,
+  target?: { name: string; groupName: string }
+): Promise<void> {
+  await setDoc(doc(db, 'users', uid), { groupId }, { merge: true })
+
+  if (actor && target) {
+    await writeAuditLog(
+      actor,
+      'group_assign',
+      { groupId, groupName: target.groupName },
+      { uid, name: target.name }
+    )
+  }
+}
