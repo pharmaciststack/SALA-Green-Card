@@ -1,4 +1,4 @@
-export type UserRole = 'employee' | 'pharmacist' | 'area_manager' | 'director' | 'admin'
+export type UserRole = 'employee' | 'pharmacist' | 'area_manager' | 'director' | 'admin' | 'super_admin'
 
 export interface UserProfile {
   uid: string

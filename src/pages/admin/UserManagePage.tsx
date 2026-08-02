@@ -5,7 +5,14 @@ import { listGroups } from '../../services/groupService'
 import { BRANCHES, POSITIONS } from '../../utils/constants'
 import { useAuth } from '../../hooks/useAuth'
 
-const ROLE_HIERARCHY: UserRole[] = ['employee', 'pharmacist', 'area_manager', 'director', 'admin']
+// Full ladder. super_admin is intentionally NOT assignable from the UI —
+// it is bootstrapped via Firebase Console only, and can never be demoted here.
+const ROLE_HIERARCHY: UserRole[] = ['employee', 'pharmacist', 'area_manager', 'director', 'admin', 'super_admin']
+
+// Roles a regular admin may assign to others (up to director).
+const ADMIN_ASSIGNABLE: UserRole[] = ['employee', 'pharmacist', 'area_manager', 'director']
+// Roles a super admin may assign (adds admin; still not super_admin).
+const SUPER_ASSIGNABLE: UserRole[] = [...ADMIN_ASSIGNABLE, 'admin']
 
 const ROLE_META: Record<UserRole, { label: string; color: string; bg: string }> = {
   employee:     { label: 'พนักงาน',        color: 'text-gray-600',   bg: 'bg-gray-100' },
@@ -13,6 +20,7 @@ const ROLE_META: Record<UserRole, { label: string; color: string; bg: string }> 
   area_manager: { label: 'ผจก.เขต',        color: 'text-purple-700', bg: 'bg-purple-50' },
   director:     { label: 'ผู้อำนวยการ',    color: 'text-orange-700', bg: 'bg-orange-50' },
   admin:        { label: 'ผู้ดูแลระบบ',    color: 'text-green-700',  bg: 'bg-green-50' },
+  super_admin:  { label: 'ผู้ดูแลสูงสุด',   color: 'text-red-700',    bg: 'bg-red-50' },
 }
 
 export default function UserManagePage() {
@@ -51,6 +59,20 @@ export default function UserManagePage() {
   async function handleRoleChange(uid: string, role: UserRole) {
     const target = users.find(u => u.uid === uid)
     if (!target || !actor) return
+    if (uid === actor.uid) {
+      window.alert('ไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้ กรุณาให้ผู้ดูแลระบบคนอื่นเปลี่ยนให้')
+      return
+    }
+    // super_admin accounts can never be modified from the UI.
+    if (target.role === 'super_admin') {
+      window.alert('ไม่สามารถแก้สิทธิ์ของผู้ดูแลระบบสูงสุดได้')
+      return
+    }
+    // Only a super admin may touch admin accounts or grant the admin role.
+    if ((target.role === 'admin' || role === 'admin') && actor.role !== 'super_admin') {
+      window.alert('เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่กำหนดสิทธิ์ระดับผู้ดูแลระบบได้')
+      return
+    }
     setSaving(uid)
     await updateUserRole(
       uid,
@@ -158,6 +180,8 @@ export default function UserManagePage() {
                 user={u}
                 groups={groups}
                 saving={saving === u.uid}
+                isSelf={u.uid === actor?.uid}
+                actorRole={actor?.role ?? 'employee'}
                 onChange={handleRoleChange}
                 onGroupChange={handleGroupChange}
               />
@@ -169,15 +193,33 @@ export default function UserManagePage() {
   )
 }
 
-function UserRow({ user, groups, saving, onChange, onGroupChange }: {
+function UserRow({ user, groups, saving, isSelf, actorRole, onChange, onGroupChange }: {
   user: UserProfile
   groups: EmployeeGroup[]
   saving: boolean
+  isSelf: boolean
+  actorRole: UserRole
   onChange: (uid: string, role: UserRole) => void
   onGroupChange: (uid: string, groupId: string) => void
 }) {
   const idx = ROLE_HIERARCHY.indexOf(user.role)
   const meta = ROLE_META[user.role] ?? ROLE_META.employee
+
+  const isSuperActor = actorRole === 'super_admin'
+  // What this actor may assign, always including the target's current role so
+  // the dropdown can display it even when it's above the actor's ceiling.
+  const assignable = isSuperActor ? SUPER_ASSIGNABLE : ADMIN_ASSIGNABLE
+  const options = assignable.includes(user.role) ? assignable : [user.role, ...assignable]
+  // Row is locked (label instead of dropdown) when it can't be edited here.
+  const locked =
+    isSelf ||
+    user.role === 'super_admin' ||
+    (user.role === 'admin' && !isSuperActor)
+  const lockLabel = isSelf
+    ? 'บัญชีของคุณ'
+    : user.role === 'super_admin'
+      ? '🔒 ผู้ดูแลสูงสุด'
+      : 'เฉพาะผู้ดูแลสูงสุด'
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
@@ -218,18 +260,22 @@ function UserRow({ user, groups, saving, onChange, onGroupChange }: {
       {/* Role dropdown */}
       <td className="px-4 py-3">
         <div className="flex items-center justify-center gap-2">
-          <select
-            value={user.role}
-            onChange={(e) => onChange(user.uid, e.target.value as UserRole)}
-            disabled={saving}
-            className="border-[1.5px] border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer
-              focus:outline-none focus:border-green-600 focus:ring-[3px] focus:ring-green-600/15
-              disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
-          >
-            {ROLE_HIERARCHY.map((r) => (
-              <option key={r} value={r}>{ROLE_META[r].label}</option>
-            ))}
-          </select>
+          {locked ? (
+            <span className="text-[11px] text-gray-400 italic min-w-[140px] text-center">{lockLabel}</span>
+          ) : (
+            <select
+              value={user.role}
+              onChange={(e) => onChange(user.uid, e.target.value as UserRole)}
+              disabled={saving}
+              className="border-[1.5px] border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white cursor-pointer
+                focus:outline-none focus:border-green-600 focus:ring-[3px] focus:ring-green-600/15
+                disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
+            >
+              {options.map((r) => (
+                <option key={r} value={r}>{ROLE_META[r].label}</option>
+              ))}
+            </select>
+          )}
           {saving && (
             <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
           )}

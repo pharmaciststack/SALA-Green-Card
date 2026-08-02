@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { to: '/admin/notify', label: 'ส่งอีเมลแจ้งเตือน', icon: '📧', roles: ['admin'] },
   { to: '/admin/settings', label: 'ตั้งค่าระบบ', icon: '⚙️', roles: ['admin'] },
   { to: '/audit-logs', label: 'ประวัติการดำเนินการ', icon: '📜', roles: ['admin', 'director'] },
+  { to: '/super-admin', label: 'ผู้ดูแลระบบสูงสุด', icon: '🔐', roles: ['super_admin'] },
 ]
 
 interface Props {
@@ -34,7 +35,11 @@ export default function Sidebar({ open, onClose }: Props) {
   const { role } = useAuth()
 
   const visible = navItems.filter(
-    (item) => !item.roles || (role && item.roles.includes(role))
+    (item) => !item.roles || (role && (
+      item.roles.includes(role) ||
+      // Super admin sees everything an admin sees, plus its own menu.
+      (role === 'super_admin' && item.roles.includes('admin'))
+    ))
   )
 
   return (

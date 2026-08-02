@@ -40,6 +40,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   area_manager: 'Area Manager',
   director: 'ผู้อำนวยการ',
   admin: 'ผู้ดูแลระบบ',
+  super_admin: 'ผู้ดูแลระบบสูงสุด',
 }
 
 // Combined counter limits

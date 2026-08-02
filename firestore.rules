@@ -6,7 +6,9 @@ service cloud.firestore {
     function myUid() { return request.auth.uid; }
     function getUser() { return get(/databases/$(database)/documents/users/$(myUid())).data; }
     function hasRole(role) { return getUser().role == role; }
-    function isAdmin() { return hasRole('admin'); }
+    function isSuperAdmin() { return hasRole('super_admin'); }
+    // super_admin inherits every admin permission across the whole ruleset.
+    function isAdmin() { return hasRole('admin') || hasRole('super_admin'); }
 
     // Users collection
     match /users/{uid} {
@@ -17,12 +19,17 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.role == 'employee'
         && request.resource.data.areaId == '';
-      // User can update own profile but cannot change role or areaId (admin-controlled fields)
+      // User can update own profile but cannot change privileged fields
       allow update: if isAuth()
         && myUid() == uid
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'areaId', 'uid', 'groupId']);
-      // Admin can write anything
-      allow write: if isAuth() && isAdmin();
+      // Super admin can write anything.
+      allow write: if isAuth() && isSuperAdmin();
+      // Regular admin can manage users, but NOT admin/super_admin accounts and
+      // cannot grant the admin or super_admin role.
+      allow update: if isAuth() && isAdmin()
+        && resource.data.role != 'admin' && resource.data.role != 'super_admin'
+        && request.resource.data.role != 'admin' && request.resource.data.role != 'super_admin';
     }
 
     // Leave quotas

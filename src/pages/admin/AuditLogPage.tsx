@@ -72,7 +72,7 @@ export default function AuditLogPage() {
           className="border-[1.5px] border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-green-600"
         >
           <option value="">ทุกสิทธิ์ (Admin + ผอ.)</option>
-          {role === 'admin' && <option value="admin">เฉพาะ Admin</option>}
+          {(role === 'admin' || role === 'super_admin') && <option value="admin">เฉพาะ Admin</option>}
           <option value="director">เฉพาะ ผอ.</option>
         </select>
         <select

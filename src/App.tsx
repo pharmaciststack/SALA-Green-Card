@@ -23,6 +23,7 @@ import QuotaManagePage from './pages/admin/QuotaManagePage'
 import AdminNotificationPage from './pages/admin/AdminNotificationPage'
 import AuditLogPage from './pages/admin/AuditLogPage'
 import SystemSettingsPage from './pages/admin/SystemSettingsPage'
+import SuperAdminPage from './pages/admin/SuperAdminPage'
 
 function RootRedirect() {
   const { isAuthenticated, isProfileComplete, loading } = useAuth()
@@ -82,6 +83,11 @@ export default function App() {
             {/* Audit logs — visible to admin and director */}
             <Route element={<ProtectedRoute allowedRoles={['admin', 'director']} />}>
               <Route path="/audit-logs" element={<AuditLogPage />} />
+            </Route>
+
+            {/* Super admin only */}
+            <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
+              <Route path="/super-admin" element={<SuperAdminPage />} />
             </Route>
 
             {/* Admin */}

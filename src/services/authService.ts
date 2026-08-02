@@ -1,5 +1,5 @@
 import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, Unsubscribe } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { UserProfile } from '../types'
 import { getCachedSettings } from './settingsService'
@@ -22,16 +22,24 @@ export function onAuthChange(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, callback)
 }
 
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const ref = doc(db, 'users', uid)
-  const snap = await getDoc(ref)
-  if (!snap.exists()) return null
-  const data = snap.data()
+function mapProfile(data: Record<string, unknown>): UserProfile {
   return {
     ...data,
-    createdAt: data.createdAt?.toDate(),
-    updatedAt: data.updatedAt?.toDate(),
+    createdAt: (data.createdAt as { toDate?: () => Date })?.toDate?.(),
+    updatedAt: (data.updatedAt as { toDate?: () => Date })?.toDate?.(),
   } as UserProfile
+}
+
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, 'users', uid))
+  return snap.exists() ? mapProfile(snap.data()) : null
+}
+
+/** Live subscription to the user's own profile so role/group changes reflect immediately. */
+export function listenUserProfile(uid: string, callback: (p: UserProfile | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'users', uid), (snap) => {
+    callback(snap.exists() ? mapProfile(snap.data()) : null)
+  })
 }
 
 export async function createOrUpdateUserProfile(

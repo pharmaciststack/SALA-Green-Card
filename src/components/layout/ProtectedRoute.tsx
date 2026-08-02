@@ -23,7 +23,12 @@ export default function ProtectedRoute({ allowedRoles }: Props) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!isProfileComplete) return <Navigate to="/register" replace />
 
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
+  // Super admin satisfies any 'admin' requirement automatically.
+  const roleAllowed = allowedRoles && role && (
+    allowedRoles.includes(role) ||
+    (role === 'super_admin' && allowedRoles.includes('admin'))
+  )
+  if (allowedRoles && role && !roleAllowed) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
