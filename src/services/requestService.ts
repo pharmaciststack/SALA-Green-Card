@@ -8,6 +8,8 @@ import { LeaveRequest, RequestType, RequestStatus, RequestDetails, UserProfile }
 import { getCurrentMonthKey } from '../utils/businessRules'
 import { COMBINED_COUNTER_MONTH_LIMIT, COMBINED_COUNTER_YEAR_LIMIT } from '../utils/constants'
 import { writeAuditLog } from './auditLogService'
+import { resolveChainForRole, stageToStatus } from './approvalFlowService'
+import { ApprovalStage } from '../types'
 
 function toRequest(id: string, data: Record<string, unknown>): LeaveRequest {
   return {
@@ -35,6 +37,9 @@ export async function createRequest(
   const isCombined = type === 'change_day_off' || type === 'late'
   const year = new Date().getFullYear()
   const reqRef = doc(collection(db, 'requests'))
+  // Resolve the submitter's approval chain and start at its first stage.
+  const chain = resolveChainForRole(profile.role)
+  const initialStatus = stageToStatus(chain[0])
 
   await runTransaction(db, async (tx) => {
     if (isCombined) {
@@ -62,7 +67,8 @@ export async function createRequest(
       submitterName: profile.displayName ?? '',
       submitterEmail: profile.email ?? '',
       areaId: profile.areaId || profile.branchName,
-      status: 'pending_pharmacist' as RequestStatus,
+      status: initialStatus,
+      chain,
       details,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -72,10 +78,17 @@ export async function createRequest(
   return reqRef.id
 }
 
-async function updateRequestStatus(
+const STAGE_FIELD: Record<ApprovalStage, 'pharmacistApproval' | 'managerApproval' | 'directorApproval'> = {
+  pharmacist: 'pharmacistApproval',
+  manager: 'managerApproval',
+  director: 'directorApproval',
+}
+
+// Apply an approve/reject at the given stage and advance along the request's
+// stored chain. On approval of the last stage the request becomes 'approved'.
+async function applyApproval(
   requestId: string,
-  status: RequestStatus,
-  approvalField: 'pharmacistApproval' | 'managerApproval' | 'directorApproval',
+  stage: ApprovalStage,
   approver: UserProfile,
   action: 'approved' | 'rejected',
   note: string
@@ -84,6 +97,17 @@ async function updateRequestStatus(
     const reqRef = doc(db, 'requests', requestId)
     const snap = await tx.get(reqRef)
     if (!snap.exists()) throw new Error('Request not found')
+    const data = snap.data()
+
+    // Legacy requests may not have a chain — fall back to the full sequence.
+    const chain: ApprovalStage[] = Array.isArray(data.chain) && data.chain.length
+      ? (data.chain as ApprovalStage[])
+      : ['pharmacist', 'manager', 'director']
+    const idx = chain.indexOf(stage)
+    const nextStage = idx >= 0 ? chain[idx + 1] : undefined
+    const status: RequestStatus = action === 'rejected'
+      ? 'rejected'
+      : nextStage ? stageToStatus(nextStage) : 'approved'
 
     const approval = {
       uid: approver.uid,
@@ -95,13 +119,13 @@ async function updateRequestStatus(
 
     tx.update(reqRef, {
       status,
-      [approvalField]: approval,
+      [STAGE_FIELD[stage]]: approval,
       updatedAt: serverTimestamp(),
     })
 
     // If final approval, decrement quota
     if (status === 'approved') {
-      const req = snap.data()
+      const req = data
       const year = new Date().getFullYear()
       const quotaRef = doc(db, 'leave_quotas', `${req.submittedBy}_${year}`)
       const qsnap = await tx.get(quotaRef)
@@ -129,20 +153,20 @@ async function updateRequestStatus(
 }
 
 export const approveByPharmacist = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'pending_manager', 'pharmacistApproval', approver, 'approved', note)
+  applyApproval(id, 'pharmacist', approver, 'approved', note)
 
 export const rejectByPharmacist = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'rejected', 'pharmacistApproval', approver, 'rejected', note)
+  applyApproval(id, 'pharmacist', approver, 'rejected', note)
 
 export const approveByManager = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'pending_director', 'managerApproval', approver, 'approved', note)
+  applyApproval(id, 'manager', approver, 'approved', note)
 
 export const rejectByManager = (id: string, approver: UserProfile, note: string) =>
-  updateRequestStatus(id, 'rejected', 'managerApproval', approver, 'rejected', note)
+  applyApproval(id, 'manager', approver, 'rejected', note)
 
 export const approveByDirector = async (id: string, approver: UserProfile, note: string) => {
   const req = await getRequest(id)
-  await updateRequestStatus(id, 'approved', 'directorApproval', approver, 'approved', note)
+  await applyApproval(id, 'director', approver, 'approved', note)
   await writeAuditLog(
     approver,
     'request_approved',
@@ -153,7 +177,7 @@ export const approveByDirector = async (id: string, approver: UserProfile, note:
 
 export const rejectByDirector = async (id: string, approver: UserProfile, note: string) => {
   const req = await getRequest(id)
-  await updateRequestStatus(id, 'rejected', 'directorApproval', approver, 'rejected', note)
+  await applyApproval(id, 'director', approver, 'rejected', note)
   await writeAuditLog(
     approver,
     'request_rejected',

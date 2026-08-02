@@ -24,6 +24,7 @@ import AdminNotificationPage from './pages/admin/AdminNotificationPage'
 import AuditLogPage from './pages/admin/AuditLogPage'
 import SystemSettingsPage from './pages/admin/SystemSettingsPage'
 import SuperAdminPage from './pages/admin/SuperAdminPage'
+import ApprovalFlowPage from './pages/admin/ApprovalFlowPage'
 
 function RootRedirect() {
   const { isAuthenticated, isProfileComplete, loading } = useAuth()
@@ -96,6 +97,7 @@ export default function App() {
               <Route path="/admin/quotas" element={<QuotaManagePage />} />
               <Route path="/admin/notify" element={<AdminNotificationPage />} />
               <Route path="/admin/settings" element={<SystemSettingsPage />} />
+              <Route path="/admin/approval-flow" element={<ApprovalFlowPage />} />
             </Route>
           </Route>
         </Route>

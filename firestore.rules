@@ -113,10 +113,14 @@ service cloud.firestore {
         hasRole('area_manager') ||
         hasRole('director')
       );
-      // Enforce submitter identity and initial status — prevents submitting pre-approved requests
+      // Submitter identity + a valid pending start status (which stage depends
+      // on the configured approval chain). 'approved' is never allowed at create,
+      // so no one can self-approve.
       allow create: if isAuth()
         && request.resource.data.submittedBy == myUid()
-        && request.resource.data.status == 'pending_pharmacist';
+        && (request.resource.data.status == 'pending_pharmacist'
+            || request.resource.data.status == 'pending_manager'
+            || request.resource.data.status == 'pending_director');
       // pharmacist and area_manager are equivalent — either can approve stages 1 and 2
       allow update: if isAuth() && (
         isAdmin() ||

@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { onAuthChange, listenUserProfile, handleRedirectResult } from './services/authService'
 import { primeSettings } from './services/settingsService'
+import { primeFlow } from './services/approvalFlowService'
 import { applyUserGroup } from './services/groupService'
 import { useAuthStore } from './store/authStore'
 
@@ -27,8 +28,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           if (unsubProfile) { unsubProfile(); unsubProfile = null }
 
           if (user) {
-            // Load org-wide settings (holidays + defaults) once.
-            await primeSettings()
+            // Load org-wide settings + approval routing once.
+            await Promise.all([primeSettings(), primeFlow()])
             // Subscribe live to this user's profile so role/group changes in
             // Firestore reflect immediately without a page refresh.
             unsubProfile = listenUserProfile(user.uid, async (profile) => {

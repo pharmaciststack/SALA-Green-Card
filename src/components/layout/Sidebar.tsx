@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { to: '/admin/quotas', label: 'จัดการโควต้า', icon: '⚙️', roles: ['admin'] },
   { to: '/admin/notify', label: 'ส่งอีเมลแจ้งเตือน', icon: '📧', roles: ['admin'] },
   { to: '/admin/settings', label: 'ตั้งค่าระบบ', icon: '⚙️', roles: ['admin'] },
+  { to: '/admin/approval-flow', label: 'สายการอนุมัติ', icon: '🔀', roles: ['admin'] },
   { to: '/audit-logs', label: 'ประวัติการดำเนินการ', icon: '📜', roles: ['admin', 'director'] },
   { to: '/super-admin', label: 'ผู้ดูแลระบบสูงสุด', icon: '🔐', roles: ['super_admin'] },
 ]

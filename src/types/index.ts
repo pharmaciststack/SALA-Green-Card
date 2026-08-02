@@ -71,6 +71,7 @@ export interface LeaveRequest {
   submitterEmail: string
   areaId: string
   status: RequestStatus
+  chain?: ApprovalStage[]        // resolved approval chain for this request (ends at director)
   createdAt: Date
   updatedAt: Date
   details: RequestDetails
@@ -142,6 +143,23 @@ export interface EmployeeGroup extends GroupSettings {
   name: string
   createdAt?: Date
   updatedAt?: Date
+}
+
+// Approval routing — depends on WHO submits the request.
+// Every resolved chain ends at 'director' (ผอ. อนุมัติทุกคน).
+export type ApprovalStage = 'pharmacist' | 'manager' | 'director'
+export type FlowSlot = ApprovalStage | 'bypass'   // 'bypass' = box นี้ไม่ต้องอนุมัติ
+
+export interface RoleApprovalFlow {
+  slots: FlowSlot[]             // 3 boxes; each picks an approver or bypass
+}
+
+export interface ApprovalFlowConfig {
+  employee: RoleApprovalFlow
+  pharmacist: RoleApprovalFlow
+  area_manager: RoleApprovalFlow
+  updatedAt?: Date
+  updatedByName?: string
 }
 
 export type AuditAction =
